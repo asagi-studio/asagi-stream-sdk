@@ -1,0 +1,4 @@
+# what make builds in the template folder
+/sdk/template/build/
+__pycache__/
+*.pyc

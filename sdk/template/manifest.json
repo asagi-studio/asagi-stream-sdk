@@ -1,0 +1,9 @@
+{
+  "id": "sample",
+  "name": "Asagi Sample",
+  "version": "0.1.0",
+  "description": "アプリを作るときのひな形。OBS とのつながり、配信・録画の状態、トラックの音量を表示します",
+  "entry": "sample.dll",
+  "abi": 1,
+  "dock": { "title": "Asagi Sample", "width": 420, "height": 300 }
+}

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asagi Sample</title>
+<!--
+  The app's page (http://127.0.0.1:<port>/apps/sample/): shown in a frame inside the Asagi Stream window,
+  and in an OBS dock when it is chosen from the dock's list of apps (the dock link is the Platform's
+  http://127.0.0.1:<port>/; a small button over the bottom-left corner goes back to that list).
+  It talks to the app's own API with relative URLs:
+    GET  api/state          what to show
+    POST api/track?n=0..5   the track to watch (POST needs the X-Asagi-Request header)
+  Everything it needs is in this file: no fonts or scripts from other sites.
+-->
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #1d2027; --raised: #262a33; --sunk: #14161b; --hair: rgba(255, 255, 255, .07);
+  --ink: #e8ebf0; --ink2: #a3abb8; --ink3: #8b93a0;
+  --asagi: #33c4c0; --kohaku: #f0ad4e; --beni: #ff5a6e;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); overflow: hidden;
+  font: 400 14px/1.5 "Segoe UI", "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+  display: flex; flex-direction: column; gap: 14px; padding: 16px;
+}
+header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+header b { font-size: 15px; font-weight: 600; }
+.ver { color: var(--ink3); font-size: 12px; }
+.chips { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px;
+  border-radius: 999px; background: rgba(255, 255, 255, .06); color: var(--ink2); white-space: nowrap;
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink3); }
+.chip.on { background: rgba(51, 196, 192, .12); color: #7fe0dd; }
+.chip.on::before { background: var(--asagi); }
+.chip.live { background: rgba(255, 90, 110, .16); color: #ff7a8a; }
+.chip.live::before { background: var(--beni); }
+.chip.rec { background: rgba(240, 173, 78, .16); color: #f6c27a; }
+.chip.rec::before { background: var(--kohaku); }
+.card { background: var(--raised); border: 1px solid var(--hair); border-radius: 12px; padding: 14px 16px; }
+.label { font-size: 11px; font-weight: 600; color: var(--ink3); letter-spacing: .12em; margin-bottom: 8px; }
+.tracks { display: flex; gap: 4px; }
+.tracks button {
+  flex: 1; height: 32px; border-radius: 8px; border: 1px solid var(--hair); background: var(--sunk); color: var(--ink2);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.tracks button[aria-pressed="true"] { background: rgba(51, 196, 192, .2); border-color: rgba(51, 196, 192, .45); color: #bff3f1; }
+.tracks button:focus-visible { outline: 2px solid var(--asagi); outline-offset: 2px; }
+.meter { display: flex; align-items: center; gap: 12px; }
+.bar { flex: 1; height: 10px; border-radius: 5px; background: var(--sunk); overflow: hidden; }
+.fill { height: 100%; width: 0; border-radius: 5px; background: var(--asagi); transition: width .08s linear; }
+.fill.hot { background: var(--kohaku); }
+.fill.clip { background: var(--beni); }
+.db { width: 72px; text-align: right; font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; }
+.db small { color: var(--ink3); font-size: 11px; font-weight: 400; margin-left: 2px; }
+#cover {
+  position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center;
+  background: rgba(29, 32, 39, .96); color: var(--ink2); font-size: 14px;
+}
+#cover.show { display: flex; }
+@media (prefers-reduced-motion: reduce) { .fill { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <b>Asagi Sample</b><span class="ver" id="ver"></span>
+  <div class="chips">
+    <span class="chip live" id="live" hidden>LIVE</span>
+    <span class="chip rec" id="rec" hidden>REC</span>
+    <span class="chip" id="obs">OBS</span>
+  </div>
+</header>
+
+<section class="card">
+  <div class="label">TRACK</div>
+  <div class="tracks" id="tracks"></div>
+</section>
+
+<section class="card">
+  <div class="label">PEAK</div>
+  <div class="meter">
+    <div class="bar"><div class="fill" id="fill"></div></div>
+    <div class="db" id="db">–</div>
+  </div>
+</section>
+
+<div id="cover"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let current = -1;
+
+// the six track buttons (OBS names them in the tooltip)
+for (let i = 0; i < 6; i++) {
+  const b = document.createElement("button");
+  b.textContent = String(i + 1);
+  b.setAttribute("aria-pressed", "false");
+  b.addEventListener("click", () => setTrack(i));
+  $("tracks").append(b);
+}
+
+function clock(seconds) {
+  const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60, s = seconds % 60;
+  const mm = String(m).padStart(h ? 2 : 1, "0"), ss = String(s).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function show(state) {
+  $("ver").textContent = state.version;
+  $("obs").classList.toggle("on", state.linked);
+  $("obs").textContent = state.linked ? "OBS" : "OBS offline";
+  $("live").hidden = !state.streaming;
+  $("live").textContent = state.streaming ? `LIVE ${clock(state.streamingFor)}` : "LIVE";
+  $("rec").hidden = !state.recording;
+  $("rec").textContent = state.recording ? `REC ${clock(state.recordingFor)}` : "REC";
+  current = state.track;
+  [...$("tracks").children].forEach((b, i) => {
+    b.setAttribute("aria-pressed", i === state.track ? "true" : "false");
+    b.title = state.tracks[i] || `Track ${i + 1}`;
+  });
+  // -60 dBFS .. 0 dBFS across the bar
+  const db = state.peakDb;
+  const pct = db === null ? 0 : Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+  $("fill").style.width = pct + "%";
+  $("fill").classList.toggle("hot", db !== null && db > -6);
+  $("fill").classList.toggle("clip", db !== null && db > -1);
+  $("db").innerHTML = db === null ? "–" : `${db.toFixed(1)}<small>dB</small>`;
+}
+
+function cover(text) {
+  $("cover").textContent = text || "";
+  $("cover").classList.toggle("show", !!text);
+}
+
+async function setTrack(n) {
+  if (n === current) return;
+  // POST needs this header: the Platform refuses POSTs without it (other sites cannot send it)
+  await fetch(`api/track?n=${n}`, { method: "POST", headers: { "X-Asagi-Request": "1" } }).catch(() => {});
+  poll(true);
+}
+
+async function poll(once) {
+  try {
+    const r = await fetch("api/state", { cache: "no-store" });
+    if (r.status === 503) cover("Off");                         // the app is turned off in Asagi Stream
+    else if (!r.ok) cover("Asagi Stream is not running");
+    else { show(await r.json()); cover(""); }
+  } catch (e) {
+    cover("Asagi Stream is not running");
+  }
+  if (!once) setTimeout(poll, 100);
+}
+poll();
+</script>
+</body>
+</html>
