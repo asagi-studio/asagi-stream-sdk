@@ -1,35 +1,37 @@
-# Asagi Stream アプリの作り方（SDK 0.5）
+# Making apps for Asagi Stream (SDK 0.5)
 
-Asagi Stream は、アプリを入れて動かすための土台です。アプリは 1 つのファイル（`.asagiapp`）で配り、
-Asagi Stream のウィンドウの「Catalog」（ローカルカタログの「Choose file」か、ウィンドウへのドラッグ＆ドロップ）で入れます。
-この SDK には、アプリを作るのに必要なものが入っています。
+日本語: [README_ja.md](README_ja.md)
 
-| 場所 | 中身 |
+Asagi Stream is a host that runs apps for streaming. An app is distributed as one file (`.asagiapp`) and added in the
+Asagi Stream window under **Catalog** (**Choose file** in the local catalog, or drag and drop onto the window).
+This SDK has what you need to make an app.
+
+| Path | What it is |
 | --- | --- |
-| `sdk/asagi_app.h` | アプリと Asagi Stream のあいだの決まり（C の関数と構造体、ABI 1） |
-| `sdk/template/` | ひな形のアプリ「Asagi Sample」。コピーして作り始めます |
-| `sdk/tools/pack_app.py` | アプリのフォルダを `.asagiapp` にまとめるツール（チェックもします） |
-| `common/Json.hpp` | ひな形が使っている小さな JSON の読み書き（ISC ライセンス） |
+| `sdk/asagi_app.h` | The contract between an app and Asagi Stream (C functions and structs, ABI 1) |
+| `sdk/template/` | A template app, "Asagi Sample". Copy it to start |
+| `sdk/tools/pack_app.py` | Packs an app folder into an `.asagiapp` (and checks it) |
+| `common/Json.hpp` | The small JSON reader and writer the template uses (ISC license) |
 
-## アプリでできること
+## What an app can do
 
-- **OBS の音を受け取る**：OBS のトラック 1〜6 のうち 1 つを選ぶと、その音が届きます（約 21 ms ごと、32 bit float）。
-- **OBS の出来事を知る**：OBS とつながった／切れた、配信・録画の開始と停止、トラックの名前。
-- **画面を出す**：`web/` に置いたページが、Asagi Stream のウィンドウの中と、OBS のカスタムブラウザドックの両方に出ます。
-- **設定を保存する**：アプリごとのデータフォルダ（`%APPDATA%\AsagiStream\apps\<id>`）。アプリを削除しても残ります。
+- **Receive OBS audio**: choose one of OBS's tracks 1–6 and its audio arrives (about every 21 ms, 32-bit float).
+- **Know what happens in OBS**: connected or disconnected, streaming and recording started and stopped, track names.
+- **Show a page**: the page in `web/` appears both inside the Asagi Stream window and in an OBS custom browser dock.
+- **Save settings**: each app has a data folder (`%APPDATA%\AsagiStream\apps\<id>`). It stays when the app is removed.
 
-## フォルダの形
+## Folder layout
 
 ```
-sample/                  ← フォルダ名は id と同じにします
-  manifest.json          ← アプリの情報（必須）
-  sample.dll             ← アプリ本体（必須、64 ビットの Windows DLL）
-  web/index.html         ← アプリの画面（/apps/sample/ で表示されます）
-  web/...                ← 画面で使う画像やスクリプト
-  licenses/...           ← 使っているライブラリやフォントのライセンス（あれば）
+sample/                  ← the folder name is the id
+  manifest.json          ← about the app (required)
+  sample.dll             ← the app itself (required, a 64-bit Windows DLL)
+  web/index.html         ← the app's page (shown at /apps/sample/)
+  web/...                ← images and scripts the page uses
+  licenses/...           ← licenses of the libraries and fonts you use (if any)
 ```
 
-DLL が別の DLL を使う場合は、同じフォルダに置けば読み込まれます（DLL のあるフォルダと System32 だけが探されます）。
+A DLL that your DLL uses is loaded when it sits in the same folder (only the DLL's folder and System32 are searched).
 
 ## manifest.json
 
@@ -38,7 +40,7 @@ DLL が別の DLL を使う場合は、同じフォルダに置けば読み込�
   "id": "sample",
   "name": "Asagi Sample",
   "version": "0.1.0",
-  "description": "アプリを作るときのひな形",
+  "description": "A template for making apps",
   "entry": "sample.dll",
   "abi": 1,
   "dock": { "title": "Asagi Sample", "width": 420, "height": 300 },
@@ -46,19 +48,19 @@ DLL が別の DLL を使う場合は、同じフォルダに置けば読み込�
 }
 ```
 
-| 項目 | 内容 |
+| Field | Meaning |
 | --- | --- |
-| `id`（必須） | 英小文字・数字・`-` で 32 文字まで（先頭と末尾に `-` は不可）。アプリを見分ける名前で、URL（`/apps/<id>/`）とフォルダ名にもなります。**一度配ったら変えません**（変えると別のアプリになります） |
-| `entry`（必須） | DLL のファイル名（英数字と `. _ -`、`.dll` で終わる） |
-| `abi`（必須） | `1`（`ASAGI_APP_ABI_VERSION`）。合わないアプリは追加できません |
-| `name` / `version` / `description` | 表示用（100 / 32 / 400 バイトまで） |
-| `dock` | OBS のドックにするときのおすすめの名前と大きさ（省略可。今の Asagi Stream では使っていません） |
-| `legacyPaths` | 昔の URL をこのアプリへ転送したいとき（例：`["/v2/"]`）。16 個まで。`/api` `/apps` などは使えません |
+| `id` (required) | Lowercase letters, digits and `-`, up to 32 characters (no `-` at the start or end). It tells apps apart and is also the URL (`/apps/<id>/`) and the folder name. **Never change it once released** (a new id makes a different app) |
+| `entry` (required) | The DLL's file name (letters, digits and `. _ -`, ending in `.dll`) |
+| `abi` (required) | `1` (`ASAGI_APP_ABI_VERSION`). An app with another value can't be added |
+| `name` / `version` / `description` | Shown to people (up to 100 / 32 / 400 bytes) |
+| `dock` | Suggested name and size for an OBS dock (optional; the current Asagi Stream doesn't use it) |
+| `legacyPaths` | Old URLs to forward to this app (for example `["/v2/"]`). Up to 16. `/api`, `/apps` and the like can't be used |
 
-## DLL（アプリ本体）
+## The DLL
 
-DLL は `asagi_app_get` という関数を 1 つだけ書き出し、`AsagiApp`（関数の表）を返します。
-C の関数と構造体だけでやりとりするので、MinGW-w64 でも Visual Studio でも作れます。
+The DLL exports one function, `asagi_app_get`, which returns an `AsagiApp` (a table of functions).
+Only C functions and structs cross the boundary, so you can build with MinGW-w64 or Visual Studio.
 
 ```cpp
 #define ASAGI_BUILDING_APP
@@ -72,94 +74,97 @@ extern "C" ASAGI_APP_EXPORT const AsagiApp* asagi_app_get(uint32_t hostAbiVersio
 }
 ```
 
-| 関数 | 呼ばれるとき |
+| Function | Called when |
 | --- | --- |
-| `create(host)` | アプリをオンにしたとき。アプリの状態を作って返します（失敗は `NULL`） |
-| `destroy(self)` | オフにしたとき・終了するとき。自分で作ったスレッドは**ここで必ず止めて待ちます**（直後に DLL が外されます） |
-| `onAudio(self, block)` | 選んだトラックの音が届いたとき。**すぐ戻ってください**（重い処理は別のスレッドへ） |
-| `onEvent(self, json)` | OBS の出来事。知らないイベントや項目は無視します（新しい Asagi Stream で増えます） |
-| `handleHttp(self, request, responder)` | 画面からの `api/...` の呼び出し。`respond` を 1 回呼んで 1 を返します。知らないパスは 0 |
+| `create(host)` | The app is turned on. Create the app's state and return it (`NULL` on failure) |
+| `destroy(self)` | The app is turned off, or Asagi Stream quits. **Stop and wait for the threads you started here** (the DLL is unloaded right after) |
+| `onAudio(self, block)` | Audio of the chosen track arrives. **Return quickly** (move heavy work to another thread) |
+| `onEvent(self, json)` | Something happened in OBS. Ignore events and fields you don't know (newer versions of Asagi Stream add more) |
+| `handleHttp(self, request, responder)` | The page calls `api/...`. Call `respond` once and return 1; return 0 for paths you don't know |
 
-`host` からは、ログ（`%LOCALAPPDATA%\AsagiStream\logs\platform.log` に出ます）、データフォルダ、
-受け取るトラックの指定（`subscribeAudio`、-1 で受け取らない）、Asagi Stream のバージョンが使えます。
+From `host` you get logging (written to `%LOCALAPPDATA%\AsagiStream\logs\platform.log`), the data folder,
+the choice of track to receive (`subscribeAudio`, -1 for none) and the version of Asagi Stream.
 
-スレッドの決まり（詳しくは `asagi_app.h`）：
+Threading rules (details in `asagi_app.h`):
 
-- `onAudio` と `onEvent` は同じスレッドから、同時には呼ばれません。
-- `handleHttp` は別のスレッドから、1 回ずつ呼ばれます。`onAudio` と同時に動くことがあるので、共有する値は atomic や mutex で守ります。
-- `create` の直後に、そのときの状態（`link`、`state`、`tracks`）がイベントとして届きます。
-- アプリの関数から C++ の例外を外に投げてはいけません（ひな形は `try` / `catch` で止めています）。
+- `onAudio` and `onEvent` are called from the same thread, never at the same time.
+- `handleHttp` is called from another thread, one call at a time. It can run while `onAudio` does, so protect shared values with atomics or a mutex.
+- Right after `create`, the current state (`link`, `state`, `tracks`) arrives as events.
+- Never let a C++ exception escape an app function (the template stops them with `try` / `catch`).
 
-イベントの例：
+Example events:
 
 ```
 {"event":"link","connected":true,"obs":"32.0.1","sampleRate":48000}
 {"event":"state","streaming":false,"recording":false}
 {"event":"streaming_started"}  "streaming_stopped"  "recording_started"  "recording_stopped"
-{"event":"tracks","names":["配信","ゲーム","","","",""]}
+{"event":"tracks","names":["Stream","Game","","","",""]}
 ```
 
-## 画面（web/）
+## The page (web/)
 
-- `web/index.html` が `http://127.0.0.1:<port>/apps/<id>/` で表示されます。ウィンドウの中では Asagi Stream のメニューの右側に、OBS ではドックのアプリ一覧から選ばれたときにドックいっぱいに出ます（どちらも iframe の中）。幅が狭くても崩れないように作ってください。
-- OBS のドックでは、マウスが乗っている間だけ、左下に一覧へ戻るボタン（30 px 四方、端から 8 px）が重なります。左下の角には大事なボタンを置かないでください。
-- アプリの API は相対パスで呼びます：`fetch("api/state")`。
-- **POST には `X-Asagi-Request: 1` ヘッダーが必要**です（ないと 403。ほかのサイトから勝手に操作されないため）。
-- アプリがオフのとき、`api/...` は `503 {"error":"app_disabled"}` を返します。ウィンドウとドックでは、オフのアプリのページは閉じられて Asagi Stream が「Off」を出しますが、ページを直接開いたときのために、503 を見て「オフ」と出すと親切です。
-- ファイル名は英数字と `. _ -` だけ（1 つの名前は 64 文字まで、`.` で始まる名前や `CON` `NUL` などは不可）。
-- 外部のサイト（CDN など）は使わず、必要なものは `web/` に入れます（オフラインでも動くように）。
+- `web/index.html` is served at `http://127.0.0.1:<port>/apps/<id>/`. In the window it appears to the right of Asagi Stream's menu; in OBS it fills the dock when it's chosen from the dock's list of apps (in an iframe in both cases). Make it work in narrow widths too.
+- In an OBS dock, while the pointer is over it, a button back to the list (30 px square, 8 px from the edges) sits over the bottom-left corner. Don't put important buttons in that corner.
+- Call your app's API with relative paths: `fetch("api/state")`.
+- **A POST needs the header `X-Asagi-Request: 1`** (without it the answer is 403, so other sites can't drive your app).
+- While the app is off, `api/...` answers `503 {"error":"app_disabled"}`. The window and the dock close the page of an app that is off and Asagi Stream shows "Off" instead, but for a page opened directly it's kind to show "Off" on a 503.
+- File names use only letters, digits and `. _ -` (up to 64 characters per name; no names that start with `.`, and no `CON`, `NUL` and the like).
+- Don't use outside sites (CDNs and so on); put everything you need in `web/` so that it works offline.
 
-## ビルドとパッケージ
+## Build and pack
 
-ひな形は MinGW-w64 と Python 3 があれば、そのまま作れます：
+With MinGW-w64 and Python 3, the template builds as it is:
 
 ```sh
-make -C sdk/template            # build/sample/ に sample.dll、build/AsagiSample-0.1.0.asagiapp ができます
+make -C sdk/template            # makes build/sample/ with sample.dll, and build/AsagiSample-0.1.0.asagiapp
 ```
 
-フォルダを別の場所にコピーして使うときは、`asagi_app.h` と `Json.hpp` の場所を教えます：
+When you copy the folder somewhere else, tell it where `asagi_app.h` and `Json.hpp` are:
 
 ```sh
 make SDK=C:/AsagiStream-SDK/sdk COMMON=C:/AsagiStream-SDK/common
 ```
 
-自分でビルドした場合は、アプリのフォルダをツールでまとめます：
+If you build your own way, pack the app folder with the tool:
 
 ```sh
 python3 sdk/tools/pack_app.py path/to/sample            # → AsagiSample-0.1.0.asagiapp
 python3 sdk/tools/pack_app.py path/to/sample -o out.asagiapp
-python3 sdk/tools/pack_app.py --check out.asagiapp       # できあがったファイルを確かめる
+python3 sdk/tools/pack_app.py --check out.asagiapp       # check a finished file
 ```
 
-ツールは Asagi Stream が追加のときに確かめることを先に全部確かめ、さらに DLL が 64 ビットで
-`asagi_app_get` を書き出しているかも見ます。`.asagiapp` の中身は「圧縮しない ZIP」です。普通の ZIP ツールで
-圧縮して作ったものは追加できません（ツールを使ってください）。
+The tool checks everything that Asagi Stream checks when a package is added, and also that the DLL is 64-bit and
+exports `asagi_app_get`. An `.asagiapp` is an uncompressed ZIP. A ZIP made with an ordinary (compressing) ZIP tool
+can't be added, so use the tool.
 
-## 試す
+## Try it
 
-- **開発中**：`AsagiStream.exe --apps-dir C:\dev\apps` のように起動すると、`C:\dev\apps\<id>\` のアプリが
-  最優先で読み込まれます。DLL を作り直すときは、先にウィンドウでアプリをオフにします（読み込み中の DLL は
-  上書きできません）。作り直してからオンにすると、新しい DLL が読み込まれます（manifest.json を変えたときは
-  Asagi Stream を起動し直します）。このフォルダのアプリはウィンドウから削除・置き換えできず、カタログにも出ません。
-- **パッケージ**：ウィンドウの「Catalog」で、ローカルカタログの「Choose file」から `.asagiapp` を選ぶか、
-  ウィンドウにドラッグ＆ドロップします。追加したアプリはローカルカタログにカードで並びます。
-- Asagi Stream を**管理者として**実行しているあいだは、追加したアプリは読み込まれません（普通に起動してください）。
+- **While developing**: start Asagi Stream as `AsagiStream.exe --apps-dir C:\dev\apps` and the apps in `C:\dev\apps\<id>\`
+  load first. Before rebuilding the DLL, turn the app off in the window (a loaded DLL can't be overwritten). Turn it on
+  after rebuilding and the new DLL loads (restart Asagi Stream when you change manifest.json). Apps in this folder can't
+  be removed or replaced from the window, and they don't appear in the catalog.
+- **As a package**: in the window's **Catalog**, choose the `.asagiapp` with **Choose file** in the local catalog, or
+  drag and drop it onto the window. Added apps show as cards in the local catalog.
+- While Asagi Stream runs **as administrator**, added apps don't load (start it normally).
 
-## 更新と削除
+## Updating and removing
 
-- 同じ `id` のパッケージを追加すると、置き換え（更新）になります。オン／オフの選択とデータフォルダはそのまま引き継がれます。
-- 削除すると、アプリのファイルが消えます。データフォルダは残るので、もう一度追加すると元の設定で使えます。
+- Adding a package with the same `id` replaces the app (an update). The on/off choice and the data folder carry over.
+- Removing an app deletes its files. The data folder stays, so adding it again brings its settings back.
 
-## 制限
+## Limits
 
-| 項目 | 上限 |
+| What | Limit |
 | --- | --- |
-| パッケージの大きさ | 64 MB |
-| ファイルの数 | 2000 |
-| ファイル名 | 英数字と `. _ - /`、1 つの名前 64 文字・全体 256 文字まで |
+| Package size | 64 MB |
+| Number of files | 2000 |
+| File names | Letters, digits and `. _ - /`; up to 64 characters per name and 256 in all |
 
-## これから
+## What's next
 
-配布用に、Asagi Studio が発行したアプリだけを入れられるようにする仕組み（署名とライセンスの確認）を
-次の段階で加える予定です。それまでは、自分で作ったアプリや信頼できるアプリだけを追加してください
-（アプリは Asagi Stream の中でプログラムとして動きます）。
+A way to accept only apps published by Asagi Studio (signatures and license checks) is planned for the next stage.
+Until then, add only apps you made or trust (an app runs as a program inside Asagi Stream).
+
+## License
+
+Copyright (c) 2026 Asagi Studio. All rights reserved. Only `common/Json.hpp` is under the ISC license (see `LICENSE-ISC.txt`).
